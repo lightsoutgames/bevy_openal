@@ -121,6 +121,7 @@ pub struct Sound {
     pub autoplay: bool,
     pub gain: f32,
     pub looping: bool,
+    pub pitch: f32,
     #[reflect(ignore)]
     pub source: Option<StaticSource>,
 }
@@ -132,6 +133,7 @@ impl Default for Sound {
             autoplay: false,
             gain: 1.,
             looping: false,
+            pitch: 1.,
             source: None,
         }
     }
@@ -159,6 +161,7 @@ fn source_system(
             if let Some(source) = sound.source.as_mut() {
                 source.set_gain(sound.gain).unwrap();
                 source.set_looping(sound.looping);
+                source.set_pitch(sound.pitch).unwrap();
                 if let Some(transform) = transform {
                     source.set_relative(false);
                     source
