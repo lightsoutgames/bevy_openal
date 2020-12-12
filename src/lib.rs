@@ -1,9 +1,14 @@
 use std::collections::HashMap;
 use std::io::Cursor;
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
+pub use alto::efx;
+use alto::efx::AuxEffectSlot;
+pub use alto::Context;
+pub use alto::Device;
 pub use alto::Source;
-use alto::{Alto, Context, Mono, StaticSource, Stereo};
+use alto::{Alto, Mono, StaticSource, Stereo};
 use bevy::{
     asset::{AssetLoader, HandleId, LoadContext, LoadedAsset},
     prelude::*,
@@ -140,9 +145,27 @@ impl Default for Sound {
 }
 pub type Sounds = HashMap<String, Sound>;
 
+#[derive(Default)]
+pub struct GlobalEffects(Vec<AuxEffectSlot>);
+
+impl Deref for GlobalEffects {
+    type Target = Vec<AuxEffectSlot>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for GlobalEffects {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 fn source_system(
     context: Res<Context>,
     buffers: Res<Buffers>,
+    mut global_effects: ResMut<GlobalEffects>,
     mut query: Query<(&mut Sounds, Option<&Transform>)>,
 ) {
     for (mut sounds, transform) in query.iter_mut() {
@@ -174,6 +197,9 @@ fn source_system(
                 } else {
                     source.set_relative(true);
                     source.set_position([0., 0., 0.]).unwrap();
+                }
+                for (send, effect) in global_effects.iter_mut().enumerate() {
+                    source.set_aux_send(send as i32, effect).unwrap();
                 }
             }
         }
@@ -218,8 +244,10 @@ impl Plugin for OpenAlPlugin {
         let context = device.new_context(None).expect("Could not create context");
         app.add_asset::<Buffer>()
             .init_asset_loader::<BufferAssetLoader>()
+            .add_thread_local_resource(device)
             .add_resource(context)
             .add_resource(Buffers::default())
+            .add_resource(GlobalEffects::default())
             .register_type::<Listener>()
             .add_system(buffer_creation_system)
             .add_system(source_system)

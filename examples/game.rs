@@ -1,5 +1,5 @@
 use bevy::{asset::LoadState, prelude::*};
-use bevy_openal::{Listener, OpenAlPlugin, Sound, Sounds};
+use bevy_openal::{efx, Context, GlobalEffects, Listener, OpenAlPlugin, Sound, Sounds};
 
 #[derive(Default)]
 struct AssetHandles {
@@ -7,8 +7,20 @@ struct AssetHandles {
     loaded: bool,
 }
 
-fn setup(asset_server: Res<AssetServer>, mut handles: ResMut<AssetHandles>) {
+fn setup(
+    asset_server: Res<AssetServer>,
+    mut handles: ResMut<AssetHandles>,
+    context: ResMut<Context>,
+    mut global_effects: ResMut<GlobalEffects>,
+) {
     handles.sounds = asset_server.load_folder(".").expect("Failed to load sfx");
+    if let Ok(mut slot) = context.new_aux_effect_slot() {
+        if let Ok(mut reverb) = context.new_effect::<efx::EaxReverbEffect>() {
+            reverb.set_preset(&efx::REVERB_PRESET_GENERIC).unwrap();
+            slot.set_effect(&reverb).unwrap();
+            global_effects.push(slot);
+        }
+    }
 }
 
 fn load_and_create_system(
@@ -32,6 +44,7 @@ fn load_and_create_system(
             Sound {
                 buffer,
                 autoplay: true,
+                gain: 0.4,
                 looping: true,
                 ..Default::default()
             },
