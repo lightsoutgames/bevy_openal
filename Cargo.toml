@@ -1,0 +1,14 @@
+[package]
+name = "bevy_openal"
+version = "0.1.0"
+authors = ["Nolan Darilek <nolan@thewordnerd.info>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+alto = "3"
+anyhow = "1"
+bevy = { git = "https://github.com/bevyengine/bevy" }
+hound = "3"
+lewton = "0.10"
