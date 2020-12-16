@@ -85,7 +85,7 @@ impl AssetLoader for BufferAssetLoader {
 #[derive(Default)]
 struct Buffers(HashMap<HandleId, Arc<alto::Buffer>>);
 
-fn buffer_creation_system(
+fn buffer_creation(
     context: Res<Context>,
     mut buffers: ResMut<Buffers>,
     mut event_reader: Local<EventReader<AssetEvent<Buffer>>>,
@@ -162,7 +162,7 @@ impl DerefMut for GlobalEffects {
     }
 }
 
-fn source_system(
+fn source_update(
     context: Res<Context>,
     buffers: Res<Buffers>,
     mut global_effects: ResMut<GlobalEffects>,
@@ -210,7 +210,7 @@ fn source_system(
 #[reflect(Component)]
 pub struct Listener;
 
-fn update_listener_system(context: ResMut<Context>, query: Query<(&Listener, Option<&Transform>)>) {
+fn listener_update(context: ResMut<Context>, query: Query<(&Listener, Option<&Transform>)>) {
     for (_, transform) in query.iter() {
         if let Some(transform) = transform {
             let matrix = transform.compute_matrix().inverse();
@@ -249,8 +249,8 @@ impl Plugin for OpenAlPlugin {
             .add_resource(Buffers::default())
             .add_resource(GlobalEffects::default())
             .register_type::<Listener>()
-            .add_system(buffer_creation_system)
-            .add_system(source_system)
-            .add_system(update_listener_system);
+            .add_system(buffer_creation.system())
+            .add_system(source_update.system())
+            .add_system(listener_update.system());
     }
 }
