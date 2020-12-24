@@ -143,6 +143,27 @@ impl Default for Sound {
         }
     }
 }
+
+impl Sound {
+    pub fn play(&mut self) {
+        if let Some(source) = self.source.as_mut() {
+            source.play();
+        }
+    }
+
+    pub fn stop(&mut self) {
+        if let Some(source) = self.source.as_mut() {
+            source.stop();
+        }
+    }
+
+    pub fn pause(&mut self) {
+        if let Some(source) = self.source.as_mut() {
+            source.pause();
+        }
+    }
+}
+
 pub type Sounds = HashMap<String, Sound>;
 
 #[derive(Default)]
