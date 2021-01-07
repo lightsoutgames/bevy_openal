@@ -119,7 +119,7 @@ fn buffer_creation(
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Reflect)]
 pub enum SoundState {
     Stopped,
     Playing,
@@ -132,12 +132,14 @@ impl Default for SoundState {
     }
 }
 
+#[derive(Reflect)]
 pub struct Sound {
     pub buffer: Handle<Buffer>,
     pub state: SoundState,
     pub gain: f32,
     pub looping: bool,
     pub pitch: f32,
+    #[reflect(ignore)]
     pub source: Option<StaticSource>,
 }
 
