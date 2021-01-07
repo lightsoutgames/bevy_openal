@@ -4,10 +4,10 @@ use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 pub use alto::efx;
-use alto::efx::AuxEffectSlot;
 pub use alto::Context;
 pub use alto::Device;
 pub use alto::Source;
+use alto::{efx::AuxEffectSlot, SourceState};
 use alto::{Alto, Mono, StaticSource, Stereo};
 use bevy::{
     asset::{AssetLoader, HandleId, LoadContext, LoadedAsset},
@@ -119,15 +119,25 @@ fn buffer_creation(
     }
 }
 
-#[derive(Reflect)]
-#[reflect(Component)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum SoundState {
+    Stopped,
+    Playing,
+    Paused,
+}
+
+impl Default for SoundState {
+    fn default() -> Self {
+        SoundState::Stopped
+    }
+}
+
 pub struct Sound {
     pub buffer: Handle<Buffer>,
-    pub autoplay: bool,
+    pub state: SoundState,
     pub gain: f32,
     pub looping: bool,
     pub pitch: f32,
-    #[reflect(ignore)]
     pub source: Option<StaticSource>,
 }
 
@@ -135,31 +145,11 @@ impl Default for Sound {
     fn default() -> Self {
         Self {
             buffer: Default::default(),
-            autoplay: false,
+            state: Default::default(),
             gain: 1.,
             looping: false,
             pitch: 1.,
             source: None,
-        }
-    }
-}
-
-impl Sound {
-    pub fn play(&mut self) {
-        if let Some(source) = self.source.as_mut() {
-            source.play();
-        }
-    }
-
-    pub fn stop(&mut self) {
-        if let Some(source) = self.source.as_mut() {
-            source.stop();
-        }
-    }
-
-    pub fn pause(&mut self) {
-        if let Some(source) = self.source.as_mut() {
-            source.pause();
         }
     }
 }
@@ -191,36 +181,67 @@ fn source_update(
 ) {
     for (mut sounds, transform) in query.iter_mut() {
         for mut sound in sounds.values_mut() {
-            if sound.source.is_none() {
-                if let Ok(mut source) = context.new_static_source() {
-                    if let Some(buffer) = buffers.0.get(&sound.buffer.id) {
-                        source.set_buffer(buffer.clone()).unwrap();
+            let state = sound.state;
+            match state {
+                SoundState::Stopped => {
+                    if let Some(source) = sound.source.as_mut() {
+                        source.stop();
+                        sound.source = None;
                     }
-                    if sound.autoplay {
+                }
+                SoundState::Playing => {
+                    if sound.source.is_none() {
+                        let mut source = context.new_static_source().unwrap();
+                        if let Some(buffer) = buffers.0.get(&sound.buffer.id) {
+                            source.set_buffer(buffer.clone()).unwrap();
+                        }
                         source.play();
+                        sound.source = Some(source);
                     }
-                    sound.source = Some(source);
+                }
+                SoundState::Paused => {
+                    if let Some(source) = sound.source.as_mut() {
+                        source.pause();
+                    } else {
+                        let mut source = context.new_static_source().unwrap();
+                        if let Some(buffer) = buffers.0.get(&sound.buffer.id) {
+                            source.set_buffer(buffer.clone()).unwrap();
+                        }
+                        source.pause();
+                        sound.source = Some(source);
+                    }
                 }
             }
             if let Some(source) = sound.source.as_mut() {
-                source.set_gain(sound.gain).unwrap();
-                source.set_looping(sound.looping);
-                source.set_pitch(sound.pitch).unwrap();
-                if let Some(transform) = transform {
-                    source.set_relative(false);
-                    source
-                        .set_position([
-                            transform.translation.x,
-                            transform.translation.y,
-                            transform.translation.z,
-                        ])
-                        .unwrap();
+                sound.state = match source.state() {
+                    SourceState::Initial => SoundState::Stopped,
+                    SourceState::Playing => SoundState::Playing,
+                    SourceState::Paused => SoundState::Paused,
+                    SourceState::Stopped => SoundState::Stopped,
+                    SourceState::Unknown(_) => SoundState::Stopped,
+                };
+                if sound.state != SoundState::Stopped {
+                    source.set_gain(sound.gain).unwrap();
+                    source.set_looping(sound.looping);
+                    source.set_pitch(sound.pitch).unwrap();
+                    if let Some(transform) = transform {
+                        source.set_relative(false);
+                        source
+                            .set_position([
+                                transform.translation.x,
+                                transform.translation.y,
+                                transform.translation.z,
+                            ])
+                            .unwrap();
+                    } else {
+                        source.set_relative(true);
+                        source.set_position([0., 0., 0.]).unwrap();
+                    }
+                    for (send, effect) in global_effects.iter_mut().enumerate() {
+                        source.set_aux_send(send as i32, effect).unwrap();
+                    }
                 } else {
-                    source.set_relative(true);
-                    source.set_position([0., 0., 0.]).unwrap();
-                }
-                for (send, effect) in global_effects.iter_mut().enumerate() {
-                    source.set_aux_send(send as i32, effect).unwrap();
+                    sound.source = None;
                 }
             }
         }
