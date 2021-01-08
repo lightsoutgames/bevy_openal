@@ -156,8 +156,6 @@ impl Default for Sound {
     }
 }
 
-pub type Sounds = HashMap<String, Sound>;
-
 #[derive(Default)]
 pub struct GlobalEffects(Vec<AuxEffectSlot>);
 
@@ -179,74 +177,108 @@ fn source_update(
     context: Res<Context>,
     buffers: Res<Buffers>,
     mut global_effects: ResMut<GlobalEffects>,
-    mut query: Query<(&mut Sounds, Option<&Transform>)>,
+    mut query: Query<(&mut Sound, Option<&Transform>, Option<&GlobalTransform>)>,
 ) {
-    for (mut sounds, transform) in query.iter_mut() {
-        for mut sound in sounds.values_mut() {
-            let state = sound.state;
-            match state {
-                SoundState::Stopped => {
-                    if let Some(source) = sound.source.as_mut() {
-                        source.stop();
-                        sound.source = None;
-                    }
-                }
-                SoundState::Playing => {
-                    if sound.source.is_none() {
-                        let mut source = context.new_static_source().unwrap();
-                        if let Some(buffer) = buffers.0.get(&sound.buffer.id) {
-                            source.set_buffer(buffer.clone()).unwrap();
-                        }
-                        source.play();
-                        sound.source = Some(source);
-                    }
-                }
-                SoundState::Paused => {
-                    if let Some(source) = sound.source.as_mut() {
-                        source.pause();
-                    } else {
-                        let mut source = context.new_static_source().unwrap();
-                        if let Some(buffer) = buffers.0.get(&sound.buffer.id) {
-                            source.set_buffer(buffer.clone()).unwrap();
-                        }
-                        source.pause();
-                        sound.source = Some(source);
-                    }
-                }
-            }
-            if let Some(source) = sound.source.as_mut() {
-                sound.state = match source.state() {
-                    SourceState::Initial => SoundState::Stopped,
-                    SourceState::Playing => SoundState::Playing,
-                    SourceState::Paused => SoundState::Paused,
-                    SourceState::Stopped => SoundState::Stopped,
-                    SourceState::Unknown(_) => SoundState::Stopped,
-                };
-                if sound.state != SoundState::Stopped {
-                    source.set_gain(sound.gain).unwrap();
-                    source.set_looping(sound.looping);
-                    source.set_pitch(sound.pitch).unwrap();
-                    if let Some(transform) = transform {
-                        source.set_relative(false);
-                        source
-                            .set_position([
-                                transform.translation.x,
-                                transform.translation.y,
-                                transform.translation.z,
-                            ])
-                            .unwrap();
-                    } else {
-                        source.set_relative(true);
-                        source.set_position([0., 0., 0.]).unwrap();
-                    }
-                    for (send, effect) in global_effects.iter_mut().enumerate() {
-                        source.set_aux_send(send as i32, effect).unwrap();
-                    }
-                } else {
+    for (mut sound, transform, global_transform) in query.iter_mut() {
+        let state = sound.state;
+        match state {
+            SoundState::Stopped => {
+                if let Some(source) = sound.source.as_mut() {
+                    source.stop();
                     sound.source = None;
                 }
             }
+            SoundState::Playing => {
+                if sound.source.is_none() {
+                    let mut source = context.new_static_source().unwrap();
+                    if let Some(buffer) = buffers.0.get(&sound.buffer.id) {
+                        source.set_buffer(buffer.clone()).unwrap();
+                    }
+                    source.play();
+                    sound.source = Some(source);
+                }
+            }
+            SoundState::Paused => {
+                if let Some(source) = sound.source.as_mut() {
+                    source.pause();
+                } else {
+                    let mut source = context.new_static_source().unwrap();
+                    if let Some(buffer) = buffers.0.get(&sound.buffer.id) {
+                        source.set_buffer(buffer.clone()).unwrap();
+                    }
+                    source.pause();
+                    sound.source = Some(source);
+                }
+            }
         }
+        let state = sound.state;
+        let gain = sound.gain;
+        let looping = sound.looping;
+        let pitch = sound.pitch;
+        let source_state = if let Some(source) = &sound.source {
+            Some(source.state())
+        } else {
+            None
+        };
+        if let Some(source_state) = source_state {
+            sound.state = match source_state {
+                SourceState::Initial => SoundState::Stopped,
+                SourceState::Playing => SoundState::Playing,
+                SourceState::Paused => SoundState::Paused,
+                SourceState::Stopped => SoundState::Stopped,
+                SourceState::Unknown(_) => SoundState::Stopped,
+            };
+        } else {
+            sound.state = SoundState::Stopped;
+        }
+        if let Some(source) = sound.source.as_mut() {
+            if state != SoundState::Stopped {
+                source.set_gain(gain).unwrap();
+                source.set_looping(looping);
+                source.set_pitch(pitch).unwrap();
+                let translation = global_transform
+                    .map(|v| v.translation)
+                    .or_else(|| transform.map(|v| v.translation));
+                if let Some(translation) = translation {
+                    source.set_relative(false);
+                    source
+                        .set_position([translation.x, translation.y, translation.z])
+                        .unwrap();
+                } else {
+                    source.set_relative(true);
+                    source.set_position([0., 0., 0.]).unwrap();
+                }
+                for (send, effect) in global_effects.iter_mut().enumerate() {
+                    source.set_aux_send(send as i32, effect).unwrap();
+                }
+            } else {
+                sound.source = None;
+            }
+        }
+    }
+}
+
+impl Sound {
+    pub fn stop(&mut self) {
+        if let Some(source) = self.source.as_mut() {
+            source.stop();
+        }
+        self.state = SoundState::Stopped;
+        self.source = None;
+    }
+
+    pub fn play(&mut self) {
+        if let Some(source) = self.source.as_mut() {
+            source.play();
+        }
+        self.state = SoundState::Playing;
+    }
+
+    pub fn pause(&mut self) {
+        if let Some(source) = self.source.as_mut() {
+            source.pause();
+        }
+        self.state = SoundState::Paused;
     }
 }
 
@@ -254,8 +286,17 @@ fn source_update(
 #[reflect(Component)]
 pub struct Listener;
 
-fn listener_update(context: ResMut<Context>, query: Query<(&Listener, Option<&Transform>)>) {
-    for (_, transform) in query.iter() {
+fn listener_update(
+    context: ResMut<Context>,
+    query: Query<(&Listener, Option<&Transform>, Option<&GlobalTransform>)>,
+) {
+    for (_, transform, global_transform) in query.iter() {
+        let transform = transform.cloned().or_else(|| {
+            global_transform.map(|v| {
+                let matrix = v.compute_matrix();
+                Transform::from_matrix(matrix)
+            })
+        });
         if let Some(transform) = transform {
             let matrix = transform.compute_matrix().inverse();
             let look = matrix.x_axis;
