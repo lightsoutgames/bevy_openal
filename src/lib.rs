@@ -236,12 +236,10 @@ fn source_update(
                 source.set_gain(gain).unwrap();
                 source.set_looping(looping);
                 source.set_pitch(pitch).unwrap();
-                //println!("Global: {:?}, transform: {:?}", global_transform, transform);
                 let translation = global_transform
                     .map(|v| v.translation)
                     .or_else(|| transform.map(|v| v.translation));
                 if let Some(translation) = translation {
-                    //println!("Translation: {:?}", translation);
                     source.set_relative(false);
                     source
                         .set_position([translation.x, translation.y, translation.z])
@@ -295,8 +293,8 @@ fn listener_update(
     for (_, transform, global_transform) in query.iter() {
         let transform: Option<Transform> = global_transform
             .map(|v| {
-                let matrix = v.compute_matrix();
-                Transform::from_matrix(matrix)
+                let transform: Transform = (*v).into();
+                transform
             })
             .or_else(|| transform.cloned());
         if let Some(transform) = transform {
