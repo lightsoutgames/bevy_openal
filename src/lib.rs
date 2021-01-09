@@ -38,6 +38,25 @@ impl AssetLoader for BufferAssetLoader {
             let cursor = Cursor::new(bytes.to_vec());
             let buffer: Option<Buffer> =
                 match load_context.path().extension().unwrap().to_str().unwrap() {
+                    "flac" => {
+                        let reader = claxon::FlacReader::new(cursor);
+                        if let Ok(mut reader) = reader {
+                            let mut samples: Vec<i16> = vec![];
+                            for sample in reader.samples() {
+                                if let Ok(sample) = sample {
+                                    samples.push(sample as i16);
+                                }
+                            }
+                            let info = reader.streaminfo();
+                            Some(Buffer {
+                                samples,
+                                sample_rate: info.sample_rate as i32,
+                                channels: info.channels as u16,
+                            })
+                        } else {
+                            None
+                        }
+                    }
                     "ogg" => {
                         let mut stream = OggStreamReader::new(cursor)?;
                         let mut samples: Vec<i16> = vec![];
@@ -78,7 +97,7 @@ impl AssetLoader for BufferAssetLoader {
     }
 
     fn extensions(&self) -> &[&str] {
-        &["mp3", "ogg", "wav"]
+        &["flac", "ogg", "wav"]
     }
 }
 
@@ -240,6 +259,7 @@ fn source_update(
                     .map(|v| v.translation)
                     .or_else(|| transform.map(|v| v.translation));
                 if let Some(translation) = translation {
+                    // println!("Translation: {:?}", translation);
                     source.set_relative(false);
                     source
                         .set_position([translation.x, translation.y, translation.z])
