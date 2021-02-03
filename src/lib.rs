@@ -192,6 +192,26 @@ impl DerefMut for GlobalEffects {
     }
 }
 
+fn update_source_position(
+    source: &mut StaticSource,
+    transform: Option<&Transform>,
+    global_transform: Option<&GlobalTransform>,
+) {
+    let translation = global_transform
+        .map(|v| v.translation)
+        .or_else(|| transform.map(|v| v.translation));
+    if let Some(translation) = translation {
+        source.set_relative(false);
+        source
+            .set_position([translation.x, translation.y, translation.z])
+            .unwrap();
+    } else {
+        //println!("No translation: {:?}, {:?}", transform, global_transform);
+        source.set_relative(true);
+        source.set_position([0., 0., 0.]).unwrap();
+    }
+}
+
 fn source_update(
     context: Res<Context>,
     buffers: Res<Buffers>,
@@ -213,6 +233,7 @@ fn source_update(
                     if let Some(buffer) = buffers.0.get(&sound.buffer.id) {
                         source.set_buffer(buffer.clone()).unwrap();
                     }
+                    update_source_position(&mut source, transform, global_transform);
                     source.play();
                     sound.source = Some(source);
                 }
@@ -255,19 +276,7 @@ fn source_update(
                 source.set_gain(gain).unwrap();
                 source.set_looping(looping);
                 source.set_pitch(pitch).unwrap();
-                let translation = global_transform
-                    .map(|v| v.translation)
-                    .or_else(|| transform.map(|v| v.translation));
-                if let Some(translation) = translation {
-                    // println!("Translation: {:?}", translation);
-                    source.set_relative(false);
-                    source
-                        .set_position([translation.x, translation.y, translation.z])
-                        .unwrap();
-                } else {
-                    source.set_relative(true);
-                    source.set_position([0., 0., 0.]).unwrap();
-                }
+                update_source_position(source, transform, global_transform);
                 for (send, effect) in global_effects.iter_mut().enumerate() {
                     source.set_aux_send(send as i32, effect).unwrap();
                 }
