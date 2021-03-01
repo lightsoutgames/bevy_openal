@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 alto = "3"
 anyhow = "1"
-bevy = "0.4"
+bevy = { git = "https://github.com/bevyengine/bevy" }
 claxon = "0.4"
 hound = "3"
 lewton = "0.10"

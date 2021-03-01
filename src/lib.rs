@@ -107,11 +107,10 @@ struct Buffers(HashMap<HandleId, Arc<alto::Buffer>>);
 fn buffer_creation(
     context: Res<Context>,
     mut buffers: ResMut<Buffers>,
-    mut event_reader: Local<EventReader<AssetEvent<Buffer>>>,
-    events: Res<Events<AssetEvent<Buffer>>>,
+    mut events: EventReader<AssetEvent<Buffer>>,
     assets: Res<Assets<Buffer>>,
 ) {
-    for event in event_reader.iter(&events) {
+    for event in events.iter() {
         match event {
             AssetEvent::Created { handle } => {
                 if let Some(buffer) = assets.get(handle) {
@@ -358,10 +357,10 @@ impl Plugin for OpenAlPlugin {
         let context = device.new_context(None).expect("Could not create context");
         app.add_asset::<Buffer>()
             .init_asset_loader::<BufferAssetLoader>()
-            .add_thread_local_resource(device)
-            .add_resource(context)
-            .add_resource(Buffers::default())
-            .add_resource(GlobalEffects::default())
+            .insert_non_send_resource(device)
+            .insert_resource(context)
+            .insert_resource(Buffers::default())
+            .insert_resource(GlobalEffects::default())
             .register_type::<Listener>()
             .add_system(buffer_creation.system())
             .add_system(source_update.system())
