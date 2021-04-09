@@ -101,8 +101,9 @@ impl AssetLoader for BufferAssetLoader {
     }
 }
 
+// TODO: Make non-public when we have multi-stage asset loading.
 #[derive(Default)]
-struct Buffers(HashMap<HandleId, Arc<alto::Buffer>>);
+pub struct Buffers(pub HashMap<HandleId, Arc<alto::Buffer>>);
 
 fn buffer_creation(
     context: Res<Context>,
