@@ -327,9 +327,8 @@ fn listener_update(
             })
             .or_else(|| transform.cloned());
         if let Some(transform) = transform {
-            let matrix = transform.compute_matrix().inverse();
-            let look = matrix.x_axis;
-            let up = matrix.z_axis;
+            let look = transform.local_x();
+            let up = transform.local_z();
             context
                 .set_position([
                     transform.translation.x,
