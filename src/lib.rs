@@ -158,6 +158,8 @@ pub struct Sound {
     pub gain: f32,
     pub looping: bool,
     pub pitch: f32,
+    pub reference_distance: f32,
+    pub rolloff_factor: f32,
     #[reflect(ignore)]
     pub source: Option<StaticSource>,
 }
@@ -170,6 +172,8 @@ impl Default for Sound {
             gain: 1.,
             looping: false,
             pitch: 1.,
+            reference_distance: 1.,
+            rolloff_factor: 1.,
             source: None,
         }
     }
@@ -255,6 +259,8 @@ fn source_update(
         let gain = sound.gain;
         let looping = sound.looping;
         let pitch = sound.pitch;
+        let reference_distance = sound.reference_distance;
+        let rolloff_factor = sound.rolloff_factor;
         let source_state = if let Some(source) = &sound.source {
             Some(source.state())
         } else {
@@ -276,6 +282,8 @@ fn source_update(
                 source.set_gain(gain).unwrap();
                 source.set_looping(looping);
                 source.set_pitch(pitch).unwrap();
+                source.set_reference_distance(reference_distance).unwrap();
+                source.set_rolloff_factor(rolloff_factor).unwrap();
                 update_source_position(source, transform, global_transform);
                 for (send, effect) in global_effects.iter_mut().enumerate() {
                     source.set_aux_send(send as i32, effect).unwrap();
