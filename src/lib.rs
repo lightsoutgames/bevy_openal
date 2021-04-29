@@ -159,6 +159,7 @@ pub struct Sound {
     pub looping: bool,
     pub pitch: f32,
     pub reference_distance: f32,
+    pub max_distance: f32,
     pub rolloff_factor: f32,
     pub bypass_global_effects: bool,
     #[reflect(ignore)]
@@ -174,6 +175,7 @@ impl Default for Sound {
             looping: false,
             pitch: 1.,
             reference_distance: 1.,
+            max_distance: f32::MAX,
             rolloff_factor: 1.,
             bypass_global_effects: false,
             source: None,
@@ -262,6 +264,7 @@ fn source_update(
         let looping = sound.looping;
         let pitch = sound.pitch;
         let reference_distance = sound.reference_distance;
+        let max_distance = sound.max_distance;
         let rolloff_factor = sound.rolloff_factor;
         let bypass_global_effects = sound.bypass_global_effects;
         let source_state = if let Some(source) = &sound.source {
@@ -286,6 +289,7 @@ fn source_update(
                 source.set_looping(looping);
                 source.set_pitch(pitch).unwrap();
                 source.set_reference_distance(reference_distance).unwrap();
+                source.set_max_distance(max_distance).unwrap();
                 source.set_rolloff_factor(rolloff_factor).unwrap();
                 update_source_position(source, transform, global_transform);
                 if !bypass_global_effects {
