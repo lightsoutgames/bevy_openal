@@ -236,7 +236,12 @@ fn source_update(
                 }
             }
             SoundState::Playing => {
-                if sound.source.is_none() {
+                if let Some(source) = sound.source.as_mut() {
+                    let source_state = source.state();
+                    if source_state == SourceState::Paused {
+                        source.play();
+                    }
+                } else {
                     let mut source = context.new_static_source().unwrap();
                     if let Some(buffer) = buffers.0.get(&sound.buffer.id) {
                         source.set_buffer(buffer.clone()).unwrap();
