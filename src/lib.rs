@@ -7,7 +7,7 @@ pub use alto::efx;
 pub use alto::Context;
 pub use alto::Device;
 pub use alto::Source;
-use alto::{efx::AuxEffectSlot, SourceState};
+use alto::{efx::AuxEffectSlot, ContextAttrs, SourceState};
 use alto::{Alto, Mono, StaticSource, Stereo};
 use bevy::{
     asset::{AssetLoader, HandleId, LoadContext, LoadedAsset},
@@ -370,13 +370,28 @@ fn listener_update(
     }
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+pub struct OpenAlConfig {
+    pub soft_hrtf: bool,
+}
+
 pub struct OpenAlPlugin;
 
 impl Plugin for OpenAlPlugin {
     fn build(&self, app: &mut AppBuilder) {
+        if !app.world().contains_resource::<OpenAlConfig>() {
+            app.insert_resource(OpenAlConfig::default());
+        }
+        let config = app.world().get_resource::<OpenAlConfig>().unwrap().clone();
         let al = Alto::load_default().expect("Could not load alto");
         let device = al.open(None).expect("Could not open device");
-        let context = device.new_context(None).expect("Could not create context");
+        let mut context_attrs = ContextAttrs::default();
+        if config.soft_hrtf {
+            context_attrs.soft_hrtf = Some(true);
+        }
+        let context = device
+            .new_context(Some(context_attrs))
+            .expect("Could not create context");
         app.add_asset::<Buffer>()
             .init_asset_loader::<BufferAssetLoader>()
             .insert_non_send_resource(device)
