@@ -1,5 +1,5 @@
 use bevy::{asset::LoadState, prelude::*};
-use bevy_openal::{efx, Context, GlobalEffects, Listener, OpenAlPlugin, Sound, Sounds};
+use bevy_openal::{efx, Context, GlobalEffects, Listener, OpenAlPlugin, Sound, SoundState};
 
 #[derive(Default)]
 struct AssetHandles {
@@ -23,8 +23,8 @@ fn setup(
     }
 }
 
-fn load_and_create_system(
-    commands: &mut Commands,
+fn load_and_create(
+    mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut handles: ResMut<AssetHandles>,
 ) {
@@ -35,31 +35,29 @@ fn load_and_create_system(
         .get_group_load_state(handles.sounds.iter().map(|handle| handle.id))
         == LoadState::Loaded;
     if handles.loaded {
-        commands.spawn((Listener::default(), Transform::default));
+        commands.spawn().insert(Listener).insert(Transform::default);
         let handle = handles.sounds[0].clone();
         let buffer = asset_server.get_handle(handle);
-        let mut sounds = Sounds::default();
-        sounds.insert(
-            "footstep".into(),
-            Sound {
+        commands
+            .spawn()
+            .insert(Transform::from_translation(Vec3::new(15., 0., 0.)))
+            .insert(Sound {
                 buffer,
-                autoplay: true,
+                state: SoundState::Playing,
                 gain: 0.4,
                 looping: true,
                 ..Default::default()
-            },
-        );
-        commands.spawn((Transform::from_translation(Vec3::new(15., 0., 0.)), sounds));
+            });
     }
 }
 
 fn main() {
     App::build()
         .add_plugins(DefaultPlugins)
-        .add_system(bevy::input::system::exit_on_esc_system)
+        .add_system(bevy::input::system::exit_on_esc_system.system())
         .add_plugin(OpenAlPlugin)
         .init_resource::<AssetHandles>()
-        .add_startup_system(setup)
-        .add_system(load_and_create_system)
+        .add_startup_system(setup.system())
+        .add_system(load_and_create.system())
         .run();
 }
