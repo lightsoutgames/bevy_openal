@@ -1,7 +1,9 @@
-use std::collections::HashMap;
-use std::io::Cursor;
-use std::ops::{Deref, DerefMut};
-use std::sync::Arc;
+use std::{
+    collections::HashMap,
+    io::Cursor,
+    ops::{Deref, DerefMut},
+    sync::{Arc, Mutex},
+};
 
 pub use alto::efx;
 pub use alto::Context;
@@ -147,7 +149,7 @@ impl Default for SoundState {
     }
 }
 
-#[derive(Reflect)]
+#[derive(Clone, Reflect)]
 pub struct Sound {
     pub buffer: Handle<Buffer>,
     pub state: SoundState,
@@ -159,7 +161,7 @@ pub struct Sound {
     pub rolloff_factor: f32,
     pub bypass_global_effects: bool,
     #[reflect(ignore)]
-    pub source: Option<StaticSource>,
+    pub source: Option<Arc<Mutex<StaticSource>>>,
 }
 
 impl Default for Sound {
@@ -255,14 +257,16 @@ fn source_update(
         match &sound.state {
             SoundState::Stopped => {
                 if let Some(source) = sound.source.as_mut() {
+                    let mut source = source.lock().unwrap();
                     source.stop();
-                    sound.source = None;
                 }
+                sound.source = None;
             }
             SoundState::Playing => {
                 if let Some(source) = sound.source.as_mut() {
+                    let mut source = source.lock().unwrap();
                     sync_source_and_components(
-                        source,
+                        &mut source,
                         transform,
                         global_transform,
                         gain,
@@ -296,15 +300,16 @@ fn source_update(
                         &mut **global_effects,
                     );
                     source.play();
-                    sound.source = Some(source);
+                    sound.source = Some(Arc::new(Mutex::new(source)));
                 }
             }
             SoundState::Paused => {
                 if let Some(source) = sound.source.as_mut() {
+                    let mut source = source.lock().unwrap();
                     if source.state() != SourceState::Paused {
                         source.pause();
                         sync_source_and_components(
-                            source,
+                            &mut source,
                             transform,
                             global_transform,
                             gain,
@@ -336,12 +341,13 @@ fn source_update(
                         &mut **global_effects,
                     );
                     source.pause();
-                    sound.source = Some(source);
+                    sound.source = Some(Arc::new(Mutex::new(source)));
                 }
             }
         }
-        if let Some(source) = &sound.source {
-            sound.state = match source.state() {
+        if let Some(source) = sound.source.clone() {
+            let source = source.lock().unwrap();
+            sound.state = match &source.state() {
                 SourceState::Initial => SoundState::Stopped,
                 SourceState::Playing => SoundState::Playing,
                 SourceState::Paused => SoundState::Paused,
@@ -355,6 +361,7 @@ fn source_update(
 impl Sound {
     pub fn stop(&mut self) {
         if let Some(source) = self.source.as_mut() {
+            let mut source = source.lock().unwrap();
             source.stop();
         }
         self.state = SoundState::Stopped;
@@ -363,6 +370,7 @@ impl Sound {
 
     pub fn play(&mut self) {
         if let Some(source) = self.source.as_mut() {
+            let mut source = source.lock().unwrap();
             source.play();
         }
         self.state = SoundState::Playing;
@@ -370,6 +378,7 @@ impl Sound {
 
     pub fn pause(&mut self) {
         if let Some(source) = self.source.as_mut() {
+            let mut source = source.lock().unwrap();
             source.pause();
         }
         self.state = SoundState::Paused;
