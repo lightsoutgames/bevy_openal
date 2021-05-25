@@ -282,25 +282,28 @@ fn source_update(
                         source.play();
                     }
                 } else {
-                    let mut source = context.new_static_source().unwrap();
-                    if let Some(buffer) = buffers.0.get(&sound.buffer.id) {
-                        source.set_buffer(buffer.clone()).unwrap();
+                    if let Ok(mut source) = context.new_static_source() {
+                        if let Some(buffer) = buffers.0.get(&sound.buffer.id) {
+                            source.set_buffer(buffer.clone()).unwrap();
+                        }
+                        sync_source_and_components(
+                            &mut source,
+                            transform,
+                            global_transform,
+                            gain,
+                            pitch,
+                            looping,
+                            reference_distance,
+                            max_distance,
+                            rolloff_factor,
+                            bypass_global_effects,
+                            &mut **global_effects,
+                        );
+                        source.play();
+                        sound.source = Some(Arc::new(Mutex::new(source)));
+                    } else {
+                        error!("Error creating source");
                     }
-                    sync_source_and_components(
-                        &mut source,
-                        transform,
-                        global_transform,
-                        gain,
-                        pitch,
-                        looping,
-                        reference_distance,
-                        max_distance,
-                        rolloff_factor,
-                        bypass_global_effects,
-                        &mut **global_effects,
-                    );
-                    source.play();
-                    sound.source = Some(Arc::new(Mutex::new(source)));
                 }
             }
             SoundState::Paused => {
@@ -403,16 +406,17 @@ fn listener_update(
         if let Some(transform) = transform {
             let look = transform.local_x();
             let up = transform.local_z();
-            context
-                .set_position([
-                    transform.translation.x,
-                    transform.translation.y,
-                    transform.translation.z,
-                ])
-                .unwrap();
-            context
-                .set_orientation(([look.x, look.y, look.z], [up.x, up.y, up.z]))
-                .unwrap();
+            if let Err(e) = context.set_position([
+                transform.translation.x,
+                transform.translation.y,
+                transform.translation.z,
+            ]) {
+                error!("Error setting listener position: {:?}", e);
+            }
+            if let Err(e) = context.set_orientation(([look.x, look.y, look.z], [up.x, up.y, up.z]))
+            {
+                error!("Error setting listener orientation: {:?}", e);
+            }
         } else {
             context.set_position([0., 0., 0.]).unwrap();
             context
