@@ -252,9 +252,11 @@ fn source_update(
             max_distance,
             rolloff_factor,
             bypass_global_effects,
+            state,
             ..
         } = *sound;
-        match &sound.state {
+        let mut clear = false;
+        match state {
             SoundState::Stopped => {
                 if let Some(source) = sound.source.as_mut() {
                     let mut source = source.lock().unwrap();
@@ -265,21 +267,25 @@ fn source_update(
             SoundState::Playing => {
                 if let Some(source) = sound.source.as_mut() {
                     let mut source = source.lock().unwrap();
-                    sync_source_and_components(
-                        &mut source,
-                        transform,
-                        global_transform,
-                        gain,
-                        pitch,
-                        looping,
-                        reference_distance,
-                        max_distance,
-                        rolloff_factor,
-                        bypass_global_effects,
-                        &mut **global_effects,
-                    );
-                    if ![SourceState::Playing, SourceState::Stopped].contains(&source.state()) {
-                        source.play();
+                    if !vec![SourceState::Playing, SourceState::Paused].contains(&source.state()) {
+                        clear = true;
+                    } else {
+                        sync_source_and_components(
+                            &mut source,
+                            transform,
+                            global_transform,
+                            gain,
+                            pitch,
+                            looping,
+                            reference_distance,
+                            max_distance,
+                            rolloff_factor,
+                            bypass_global_effects,
+                            &mut **global_effects,
+                        );
+                        if source.state() != SourceState::Playing {
+                            source.play();
+                        }
                     }
                 } else {
                     if let Ok(mut source) = context.new_static_source() {
@@ -347,6 +353,10 @@ fn source_update(
                     sound.source = Some(Arc::new(Mutex::new(source)));
                 }
             }
+        }
+        if clear {
+            sound.source = None;
+            sound.state = SoundState::Stopped;
         }
         if let Some(source) = sound.source.clone() {
             let source = source.lock().unwrap();
