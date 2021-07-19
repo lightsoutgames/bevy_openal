@@ -159,6 +159,7 @@ pub struct Sound {
     pub reference_distance: f32,
     pub max_distance: f32,
     pub rolloff_factor: f32,
+    pub radius: f32,
     pub bypass_global_effects: bool,
     #[reflect(ignore)]
     pub source: Option<Arc<Mutex<StaticSource>>>,
@@ -175,6 +176,7 @@ impl Default for Sound {
             reference_distance: 1.,
             max_distance: f32::MAX,
             rolloff_factor: 1.,
+            radius: 1.,
             bypass_global_effects: false,
             source: None,
         }
@@ -209,6 +211,7 @@ fn sync_source_and_components(
     reference_distance: f32,
     max_distance: f32,
     rolloff_factor: f32,
+    radius: f32,
     bypass_global_effects: bool,
     global_effects: &mut Vec<AuxEffectSlot>,
 ) {
@@ -230,6 +233,7 @@ fn sync_source_and_components(
     source.set_reference_distance(reference_distance).unwrap();
     source.set_max_distance(max_distance).unwrap();
     source.set_rolloff_factor(rolloff_factor).unwrap();
+    source.set_radius(radius).unwrap();
     if !bypass_global_effects {
         for (send, effect) in global_effects.iter_mut().enumerate() {
             source.set_aux_send(send as i32, effect).unwrap();
@@ -251,6 +255,7 @@ fn source_update(
             reference_distance,
             max_distance,
             rolloff_factor,
+            radius,
             bypass_global_effects,
             state,
             ..
@@ -280,6 +285,7 @@ fn source_update(
                             reference_distance,
                             max_distance,
                             rolloff_factor,
+                            radius,
                             bypass_global_effects,
                             &mut **global_effects,
                         );
@@ -302,6 +308,7 @@ fn source_update(
                             reference_distance,
                             max_distance,
                             rolloff_factor,
+                            radius,
                             bypass_global_effects,
                             &mut **global_effects,
                         );
@@ -327,6 +334,7 @@ fn source_update(
                             reference_distance,
                             max_distance,
                             rolloff_factor,
+                            radius,
                             bypass_global_effects,
                             &mut **global_effects,
                         );
@@ -346,6 +354,7 @@ fn source_update(
                         reference_distance,
                         max_distance,
                         rolloff_factor,
+                        radius,
                         bypass_global_effects,
                         &mut **global_effects,
                     );
