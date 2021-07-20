@@ -176,7 +176,7 @@ impl Default for Sound {
             reference_distance: 1.,
             max_distance: f32::MAX,
             rolloff_factor: 1.,
-            radius: 1.,
+            radius: 0.,
             bypass_global_effects: false,
             source: None,
         }
