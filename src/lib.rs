@@ -15,6 +15,7 @@ use bevy::{
     asset::{AssetLoader, HandleId, LoadContext, LoadedAsset},
     prelude::*,
     reflect::TypeUuid,
+    transform::TransformSystem,
     utils::BoxedFuture,
 };
 use lewton::inside_ogg::OggStreamReader;
@@ -475,7 +476,17 @@ impl Plugin for OpenAlPlugin {
             .insert_resource(GlobalEffects::default())
             .register_type::<Listener>()
             .add_system(buffer_creation.system())
-            .add_system(source_update.system())
-            .add_system(listener_update.system());
+            .add_system_to_stage(
+                CoreStage::PostUpdate,
+                source_update
+                    .system()
+                    .after(TransformSystem::TransformPropagate),
+            )
+            .add_system_to_stage(
+                CoreStage::PostUpdate,
+                listener_update
+                    .system()
+                    .after(TransformSystem::TransformPropagate),
+            );
     }
 }
