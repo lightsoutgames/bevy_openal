@@ -19,6 +19,7 @@ use bevy::{
     utils::BoxedFuture,
 };
 use lewton::inside_ogg::OggStreamReader;
+use minimp3::{Decoder, Error};
 
 #[derive(Clone, Debug, TypeUuid)]
 #[uuid = "aa22d11e-3bed-11eb-8708-00155dea3db9"]
@@ -70,6 +71,36 @@ impl AssetLoader for BufferAssetLoader {
                             sample_rate: stream.ident_hdr.audio_sample_rate as i32,
                         })
                     }
+                    "mp3" => {
+                        let mut decoder = Decoder::new(cursor);
+                        let mut samples: Vec<i16> = vec![];
+                        let mut channels = 0_u16;
+                        let mut sample_rate = 0;
+                        let mut succeeded = true;
+                        loop {
+                            match decoder.next_frame() {
+                                Ok(mut frame) => {
+                                    samples.append(&mut frame.data);
+                                    channels = frame.channels as u16;
+                                    sample_rate = frame.sample_rate;
+                                }
+                                Err(Error::Eof) => break,
+                                Err(_) => {
+                                    succeeded = false;
+                                    break;
+                                }
+                            };
+                        }
+                        if succeeded {
+                            Some(Buffer {
+                                samples,
+                                channels,
+                                sample_rate,
+                            })
+                        } else {
+                            None
+                        }
+                    }
                     "wav" => {
                         let reader = hound::WavReader::new(cursor);
                         if let Ok(mut reader) = reader {
@@ -96,7 +127,7 @@ impl AssetLoader for BufferAssetLoader {
     }
 
     fn extensions(&self) -> &[&str] {
-        &["flac", "ogg", "wav"]
+        &["flac", "ogg", "mp3", "wav"]
     }
 }
 
