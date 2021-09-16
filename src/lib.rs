@@ -254,21 +254,21 @@ fn sync_source_and_components(
         source.set_relative(false);
         source
             .set_position([translation.x, translation.y, translation.z])
-            .unwrap();
+            .ok();
     } else {
         source.set_relative(true);
-        source.set_position([0., 0., 0.]).unwrap();
+        source.set_position([0., 0., 0.]).ok();
     }
-    source.set_gain(gain).unwrap();
-    source.set_pitch(pitch).unwrap();
+    source.set_gain(gain).ok();
+    source.set_pitch(pitch).ok();
     source.set_looping(looping);
-    source.set_reference_distance(reference_distance).unwrap();
-    source.set_max_distance(max_distance).unwrap();
-    source.set_rolloff_factor(rolloff_factor).unwrap();
-    source.set_radius(radius).unwrap();
+    source.set_reference_distance(reference_distance).ok();
+    source.set_max_distance(max_distance).ok();
+    source.set_rolloff_factor(rolloff_factor).ok();
+    source.set_radius(radius).ok();
     if !bypass_global_effects {
         for (send, effect) in global_effects.iter_mut().enumerate() {
-            source.set_aux_send(send as i32, effect).unwrap();
+            source.set_aux_send(send as i32, effect).ok();
         }
     }
 }
@@ -469,10 +469,8 @@ fn listener_update(
                 error!("Error setting listener orientation: {:?}", e);
             }
         } else {
-            context.set_position([0., 0., 0.]).unwrap();
-            context
-                .set_orientation(([0., 0., 1.], [0., 1., 0.]))
-                .unwrap();
+            context.set_position([0., 0., 0.]).ok();
+            context.set_orientation(([0., 0., 1.], [0., 1., 0.])).ok();
         }
     }
 }
