@@ -315,6 +315,20 @@ fn update_source_properties(
             ..
         } = *sound;
         if state != SoundState::Stopped {
+            let mut swap_buffers = false;
+            if let Some(source) = &sound.source {
+                let source = source.lock().unwrap();
+                if let Some(source_buffer) = source.buffer() {
+                    if let Some(sound_buffer) = buffers.0.get(&sound.buffer.id) {
+                        if source_buffer.as_raw() != sound_buffer.as_raw() {
+                            swap_buffers = true;
+                        }
+                    }
+                }
+            }
+            if swap_buffers {
+                sound.source = None;
+            }
             if sound.source.is_none() {
                 if let Ok(mut source) = context.new_static_source() {
                     if let Some(buffer) = buffers.0.get(&sound.buffer.id) {
