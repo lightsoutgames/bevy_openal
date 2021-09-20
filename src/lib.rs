@@ -215,203 +215,6 @@ impl Default for Sound {
     }
 }
 
-#[derive(Default)]
-pub struct GlobalEffects(Vec<AuxEffectSlot>);
-
-impl Deref for GlobalEffects {
-    type Target = Vec<AuxEffectSlot>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for GlobalEffects {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-fn sync_source_and_components(
-    source: &mut StaticSource,
-    transform: Option<&Transform>,
-    global_transform: Option<&GlobalTransform>,
-    gain: f32,
-    pitch: f32,
-    looping: bool,
-    reference_distance: f32,
-    max_distance: f32,
-    rolloff_factor: f32,
-    radius: f32,
-    bypass_global_effects: bool,
-    global_effects: &mut Vec<AuxEffectSlot>,
-) {
-    let translation = global_transform
-        .map(|v| v.translation)
-        .or_else(|| transform.map(|v| v.translation));
-    if let Some(translation) = translation {
-        source.set_relative(false);
-        source
-            .set_position([translation.x, translation.y, translation.z])
-            .ok();
-    } else {
-        source.set_relative(true);
-        source.set_position([0., 0., 0.]).ok();
-    }
-    source.set_gain(gain).ok();
-    source.set_pitch(pitch).ok();
-    source.set_looping(looping);
-    source.set_reference_distance(reference_distance).ok();
-    source.set_max_distance(max_distance).ok();
-    source.set_rolloff_factor(rolloff_factor).ok();
-    source.set_radius(radius).ok();
-    if !bypass_global_effects {
-        for (send, effect) in global_effects.iter_mut().enumerate() {
-            source.set_aux_send(send as i32, effect).ok();
-        }
-    }
-}
-
-fn source_update(
-    context: Res<Context>,
-    buffers: Res<Buffers>,
-    mut global_effects: ResMut<GlobalEffects>,
-    mut query: Query<(&mut Sound, Option<&Transform>, Option<&GlobalTransform>)>,
-) {
-    for (mut sound, transform, global_transform) in query.iter_mut() {
-        let Sound {
-            gain,
-            pitch,
-            looping,
-            reference_distance,
-            max_distance,
-            rolloff_factor,
-            radius,
-            bypass_global_effects,
-            state,
-            ..
-        } = *sound;
-        let mut clear = false;
-        match state {
-            SoundState::Stopped => {
-                if let Some(source) = sound.source.as_mut() {
-                    let mut source = source.lock().unwrap();
-                    source.stop();
-                }
-                sound.source = None;
-            }
-            SoundState::Playing => {
-                if let Some(source) = sound.source.as_mut() {
-                    let mut source = source.lock().unwrap();
-                    if !vec![SourceState::Playing, SourceState::Paused].contains(&source.state()) {
-                        clear = true;
-                    } else {
-                        sync_source_and_components(
-                            &mut source,
-                            transform,
-                            global_transform,
-                            gain,
-                            pitch,
-                            looping,
-                            reference_distance,
-                            max_distance,
-                            rolloff_factor,
-                            radius,
-                            bypass_global_effects,
-                            &mut **global_effects,
-                        );
-                        if source.state() != SourceState::Playing {
-                            source.play();
-                        }
-                    }
-                } else {
-                    if let Ok(mut source) = context.new_static_source() {
-                        if let Some(buffer) = buffers.0.get(&sound.buffer.id) {
-                            source.set_buffer(buffer.clone()).unwrap();
-                        }
-                        sync_source_and_components(
-                            &mut source,
-                            transform,
-                            global_transform,
-                            gain,
-                            pitch,
-                            looping,
-                            reference_distance,
-                            max_distance,
-                            rolloff_factor,
-                            radius,
-                            bypass_global_effects,
-                            &mut **global_effects,
-                        );
-                        source.play();
-                        sound.source = Some(Arc::new(Mutex::new(source)));
-                    } else {
-                        error!("Error creating source");
-                    }
-                }
-            }
-            SoundState::Paused => {
-                if let Some(source) = sound.source.as_mut() {
-                    let mut source = source.lock().unwrap();
-                    if source.state() != SourceState::Paused {
-                        source.pause();
-                        sync_source_and_components(
-                            &mut source,
-                            transform,
-                            global_transform,
-                            gain,
-                            pitch,
-                            looping,
-                            reference_distance,
-                            max_distance,
-                            rolloff_factor,
-                            radius,
-                            bypass_global_effects,
-                            &mut **global_effects,
-                        );
-                    }
-                } else {
-                    let mut source = context.new_static_source().unwrap();
-                    if let Some(buffer) = buffers.0.get(&sound.buffer.id) {
-                        source.set_buffer(buffer.clone()).unwrap();
-                    }
-                    sync_source_and_components(
-                        &mut source,
-                        transform,
-                        global_transform,
-                        gain,
-                        pitch,
-                        looping,
-                        reference_distance,
-                        max_distance,
-                        rolloff_factor,
-                        radius,
-                        bypass_global_effects,
-                        &mut **global_effects,
-                    );
-                    source.pause();
-                    sound.source = Some(Arc::new(Mutex::new(source)));
-                }
-            }
-        }
-        if clear {
-            sound.source = None;
-            sound.state = SoundState::Stopped;
-        }
-        if let Some(source) = sound.source.clone() {
-            let source = source.lock().unwrap();
-            sound.state = match &source.state() {
-                SourceState::Initial => SoundState::Stopped,
-                SourceState::Playing => SoundState::Playing,
-                SourceState::Paused => SoundState::Paused,
-                SourceState::Stopped => SoundState::Stopped,
-                SourceState::Unknown(_) => SoundState::Stopped,
-            };
-        }
-    }
-}
-
 impl Sound {
     pub fn stop(&mut self) {
         if let Some(source) = self.source.as_mut() {
@@ -443,7 +246,24 @@ impl Sound {
 #[reflect(Component)]
 pub struct Listener;
 
-fn listener_update(
+#[derive(Default)]
+pub struct GlobalEffects(Vec<AuxEffectSlot>);
+
+impl Deref for GlobalEffects {
+    type Target = Vec<AuxEffectSlot>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for GlobalEffects {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+fn update_listener(
     context: ResMut<Context>,
     query: Query<(&Listener, Option<&Transform>, Option<&GlobalTransform>)>,
 ) {
@@ -475,12 +295,131 @@ fn listener_update(
     }
 }
 
+fn update_source_properties(
+    context: Res<Context>,
+    buffers: Res<Buffers>,
+    mut global_effects: ResMut<GlobalEffects>,
+    mut query: Query<(&mut Sound, Option<&Transform>, Option<&GlobalTransform>)>,
+) {
+    for (mut sound, transform, global_transform) in query.iter_mut() {
+        let Sound {
+            gain,
+            pitch,
+            looping,
+            reference_distance,
+            max_distance,
+            rolloff_factor,
+            radius,
+            bypass_global_effects,
+            state,
+            ..
+        } = *sound;
+        if state != SoundState::Stopped {
+            if sound.source.is_none() {
+                if let Ok(mut source) = context.new_static_source() {
+                    if let Some(buffer) = buffers.0.get(&sound.buffer.id) {
+                        source.set_buffer(buffer.clone()).unwrap();
+                    }
+                    sound.source = Some(Arc::new(Mutex::new(source)));
+                }
+            }
+            if let Some(source) = sound.source.as_mut() {
+                let mut source = source.lock().unwrap();
+                let translation = global_transform
+                    .map(|v| v.translation)
+                    .or_else(|| transform.map(|v| v.translation));
+                if let Some(translation) = translation {
+                    source.set_relative(false);
+                    source
+                        .set_position([translation.x, translation.y, translation.z])
+                        .ok();
+                } else {
+                    source.set_relative(true);
+                    source.set_position([0., 0., 0.]).ok();
+                }
+                source.set_gain(gain).ok();
+                source.set_pitch(pitch).ok();
+                source.set_looping(looping);
+                source.set_reference_distance(reference_distance).ok();
+                source.set_max_distance(max_distance).ok();
+                source.set_rolloff_factor(rolloff_factor).ok();
+                source.set_radius(radius).ok();
+                if !bypass_global_effects {
+                    for (send, effect) in global_effects.iter_mut().enumerate() {
+                        source.set_aux_send(send as i32, effect).ok();
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn update_source_state(mut query: Query<&mut Sound>) {
+    for mut sound in query.iter_mut() {
+        let mut clear = false;
+        match &sound.state {
+            SoundState::Stopped => {
+                if let Some(source) = sound.source.as_mut() {
+                    let mut source = source.lock().unwrap();
+                    source.stop();
+                }
+                sound.source = None;
+            }
+            SoundState::Playing => {
+                if let Some(source) = sound.source.as_mut() {
+                    let mut source = source.lock().unwrap();
+                    if !vec![
+                        SourceState::Initial,
+                        SourceState::Playing,
+                        SourceState::Paused,
+                    ]
+                    .contains(&source.state())
+                    {
+                        clear = true;
+                    } else if source.state() != SourceState::Playing {
+                        source.play();
+                    }
+                }
+            }
+            SoundState::Paused => {
+                if let Some(source) = sound.source.as_mut() {
+                    let mut source = source.lock().unwrap();
+                    if source.state() != SourceState::Paused {
+                        source.pause();
+                    }
+                }
+            }
+        }
+        if clear {
+            sound.source = None;
+            sound.state = SoundState::Stopped;
+        }
+        if let Some(source) = sound.source.clone() {
+            let source = source.lock().unwrap();
+            sound.state = match &source.state() {
+                SourceState::Initial => SoundState::Stopped,
+                SourceState::Playing => SoundState::Playing,
+                SourceState::Paused => SoundState::Paused,
+                SourceState::Stopped => SoundState::Stopped,
+                SourceState::Unknown(_) => SoundState::Stopped,
+            };
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct OpenAlConfig {
     pub soft_hrtf: bool,
 }
 
 pub struct OpenAlPlugin;
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, SystemLabel)]
+pub enum OpenAlSystem {
+    UpdateListener,
+    UpdateSourceProperties,
+    UpdateSourceState,
+}
 
 impl Plugin for OpenAlPlugin {
     fn build(&self, app: &mut AppBuilder) {
@@ -507,15 +446,25 @@ impl Plugin for OpenAlPlugin {
             .add_system(buffer_creation.system())
             .add_system_to_stage(
                 CoreStage::PostUpdate,
-                source_update
+                update_listener
                     .system()
-                    .after(TransformSystem::TransformPropagate),
+                    .label(OpenAlSystem::UpdateListener)
+                    .after(TransformSystem::TransformPropagate)
+                    .before(OpenAlSystem::UpdateSourceState),
             )
             .add_system_to_stage(
                 CoreStage::PostUpdate,
-                listener_update
+                update_source_properties
                     .system()
-                    .after(TransformSystem::TransformPropagate),
+                    .label(OpenAlSystem::UpdateSourceProperties)
+                    .after(TransformSystem::TransformPropagate)
+                    .before(OpenAlSystem::UpdateSourceState),
+            )
+            .add_system_to_stage(
+                CoreStage::PostUpdate,
+                update_source_state
+                    .system()
+                    .label(OpenAlSystem::UpdateSourceState),
             );
     }
 }
