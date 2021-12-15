@@ -181,7 +181,7 @@ impl Default for SoundState {
     }
 }
 
-#[derive(Clone, Reflect)]
+#[derive(Component, Clone, Reflect)]
 pub struct Sound {
     pub buffer: Handle<Buffer>,
     pub state: SoundState,
@@ -242,7 +242,7 @@ impl Sound {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Reflect)]
+#[derive(Component, Clone, Copy, Debug, Default, Reflect)]
 #[reflect(Component)]
 pub struct Listener;
 
@@ -436,11 +436,11 @@ pub enum OpenAlSystem {
 }
 
 impl Plugin for OpenAlPlugin {
-    fn build(&self, app: &mut AppBuilder) {
-        if !app.world().contains_resource::<OpenAlConfig>() {
+    fn build(&self, app: &mut App) {
+        if !app.world.contains_resource::<OpenAlConfig>() {
             app.insert_resource(OpenAlConfig::default());
         }
-        let config = *app.world().get_resource::<OpenAlConfig>().unwrap();
+        let config = *app.world.get_resource::<OpenAlConfig>().unwrap();
         let al = Alto::load_default().expect("Could not load alto");
         let device = al.open(None).expect("Could not open device");
         let mut context_attrs = ContextAttrs::default();
@@ -457,11 +457,10 @@ impl Plugin for OpenAlPlugin {
             .insert_resource(Buffers::default())
             .insert_resource(GlobalEffects::default())
             .register_type::<Listener>()
-            .add_system(buffer_creation.system())
+            .add_system(buffer_creation)
             .add_system_to_stage(
                 CoreStage::PostUpdate,
                 update_listener
-                    .system()
                     .label(OpenAlSystem::UpdateListener)
                     .after(TransformSystem::TransformPropagate)
                     .before(OpenAlSystem::UpdateSourceState),
@@ -469,16 +468,13 @@ impl Plugin for OpenAlPlugin {
             .add_system_to_stage(
                 CoreStage::PostUpdate,
                 update_source_properties
-                    .system()
                     .label(OpenAlSystem::UpdateSourceProperties)
                     .after(TransformSystem::TransformPropagate)
                     .before(OpenAlSystem::UpdateSourceState),
             )
             .add_system_to_stage(
                 CoreStage::PostUpdate,
-                update_source_state
-                    .system()
-                    .label(OpenAlSystem::UpdateSourceState),
+                update_source_state.label(OpenAlSystem::UpdateSourceState),
             );
     }
 }
