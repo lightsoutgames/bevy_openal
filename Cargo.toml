@@ -10,7 +10,7 @@ edition = "2021"
 [dependencies]
 alto = "3"
 anyhow = "1"
-bevy = { git = "https://github.com/bevyengine/bevy.git", default-features = false }
+bevy = { version = "0.6", default-features = false }
 claxon = "0.4"
 hound = "3"
 lewton = "0.10"
