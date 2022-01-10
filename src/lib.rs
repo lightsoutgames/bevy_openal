@@ -182,6 +182,7 @@ impl Default for SoundState {
 }
 
 #[derive(Component, Clone, Reflect)]
+#[reflect(Component)]
 pub struct Sound {
     pub buffer: Handle<Buffer>,
     pub state: SoundState,
