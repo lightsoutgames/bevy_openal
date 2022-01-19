@@ -266,9 +266,9 @@ impl DerefMut for GlobalEffects {
 
 fn update_listener(
     context: ResMut<Context>,
-    query: Query<(&Listener, Option<&Transform>, Option<&GlobalTransform>)>,
+    listener: Query<(Option<&Transform>, Option<&GlobalTransform>), With<Listener>>,
 ) {
-    for (_, transform, global_transform) in query.iter() {
+    if let Ok((transform, global_transform)) = listener.get_single() {
         let transform: Option<Transform> = global_transform
             .map(|v| {
                 let transform: Transform = (*v).into();
@@ -293,6 +293,9 @@ fn update_listener(
             context.set_position([0., 0., 0.]).ok();
             context.set_orientation(([0., 0., 1.], [0., 1., 0.])).ok();
         }
+    } else {
+        context.set_position([0., 0., 0.]).ok();
+        context.set_orientation(([0., 0., 1.], [0., 1., 0.])).ok();
     }
 }
 
