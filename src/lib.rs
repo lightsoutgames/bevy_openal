@@ -30,7 +30,7 @@ pub struct Buffer {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct BufferAssetLoader;
+struct BufferAssetLoader;
 
 impl AssetLoader for BufferAssetLoader {
     fn load<'a>(
