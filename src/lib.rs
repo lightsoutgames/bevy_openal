@@ -1,16 +1,11 @@
 use std::{
     collections::HashMap,
     io::Cursor,
-    ops::{Deref, DerefMut},
     sync::{Arc, Mutex},
 };
 
-pub use alto::efx;
-pub use alto::Context;
-pub use alto::Device;
-pub use alto::Source;
-use alto::{efx::AuxEffectSlot, ContextAttrs, SourceState};
-use alto::{Alto, Mono, StaticSource, Stereo};
+pub use alto::{efx, Context, Device, Source};
+use alto::{efx::AuxEffectSlot, Alto, ContextAttrs, Mono, SourceState, StaticSource, Stereo};
 use bevy::{
     asset::{AssetLoader, HandleId, LoadContext, LoadedAsset},
     prelude::*,
@@ -18,6 +13,7 @@ use bevy::{
     transform::TransformSystem,
     utils::BoxedFuture,
 };
+use derive_more::{Deref, DerefMut};
 use lewton::inside_ogg::OggStreamReader;
 use minimp3::{Decoder, Error};
 
@@ -247,22 +243,8 @@ impl Sound {
 #[reflect(Component)]
 pub struct Listener;
 
-#[derive(Default)]
+#[derive(Default, Deref, DerefMut)]
 pub struct GlobalEffects(Vec<AuxEffectSlot>);
-
-impl Deref for GlobalEffects {
-    type Target = Vec<AuxEffectSlot>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for GlobalEffects {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
 
 fn update_listener(
     context: ResMut<Context>,
