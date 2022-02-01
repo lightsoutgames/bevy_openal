@@ -101,8 +101,10 @@ impl AssetLoader for BufferAssetLoader {
                         let reader = hound::WavReader::new(cursor);
                         if let Ok(mut reader) = reader {
                             let mut samples: Vec<i16> = vec![];
-                            for sample in reader.samples::<i16>().flatten() {
-                                samples.push(sample);
+                            for sample in reader.samples::<i16>() {
+                                if let Ok(sample) = sample {
+                                    samples.push(sample);
+                                }
                             }
                             Some(Buffer {
                                 samples,
