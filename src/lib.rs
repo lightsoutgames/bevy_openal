@@ -352,6 +352,8 @@ fn update_source_properties(
                     }
                 }
             }
+        } else if sound.source.is_some() {
+            sound.source = None;
         }
     }
 }
