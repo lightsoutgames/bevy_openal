@@ -166,6 +166,13 @@ fn buffer_creation(
     }
 }
 
+#[derive(Default, Deref, DerefMut)]
+pub struct GlobalEffects(Vec<AuxEffectSlot>);
+
+#[derive(Component, Clone, Copy, Debug, Default, Reflect)]
+#[reflect(Component)]
+pub struct Listener;
+
 #[derive(Clone, Copy, Debug, PartialEq, Reflect)]
 pub enum SoundState {
     Stopped,
@@ -241,12 +248,19 @@ impl Sound {
     }
 }
 
-#[derive(Component, Clone, Copy, Debug, Default, Reflect)]
-#[reflect(Component)]
-pub struct Listener;
-
-#[derive(Default, Deref, DerefMut)]
-pub struct GlobalEffects(Vec<AuxEffectSlot>);
+fn setup(mut commands: Commands, config: Res<OpenAlConfig>) {
+    let al = Alto::load_default().expect("Could not load alto");
+    let device = al.open(None).expect("Could not open device");
+    let mut context_attrs = ContextAttrs::default();
+    if config.soft_hrtf {
+        context_attrs.soft_hrtf = Some(true);
+    }
+    let context = device
+        .new_context(Some(context_attrs))
+        .expect("Could not create context");
+    commands.insert_resource(device);
+    commands.insert_resource(context);
+}
 
 fn update_listener(
     context: ResMut<Context>,
@@ -420,6 +434,7 @@ pub struct OpenAlPlugin;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, SystemLabel)]
 pub enum OpenAlSystem {
+    Setup,
     UpdateListener,
     UpdateSourceProperties,
     UpdateSourceState,
@@ -430,23 +445,12 @@ impl Plugin for OpenAlPlugin {
         if !app.world.contains_resource::<OpenAlConfig>() {
             app.insert_resource(OpenAlConfig::default());
         }
-        let config = *app.world.get_resource::<OpenAlConfig>().unwrap();
-        let al = Alto::load_default().expect("Could not load alto");
-        let device = al.open(None).expect("Could not open device");
-        let mut context_attrs = ContextAttrs::default();
-        if config.soft_hrtf {
-            context_attrs.soft_hrtf = Some(true);
-        }
-        let context = device
-            .new_context(Some(context_attrs))
-            .expect("Could not create context");
         app.add_asset::<Buffer>()
             .init_asset_loader::<BufferAssetLoader>()
-            .insert_non_send_resource(device)
-            .insert_resource(context)
             .insert_resource(Buffers::default())
             .insert_resource(GlobalEffects::default())
             .register_type::<Listener>()
+            .add_startup_system(setup.label(OpenAlSystem::Setup))
             .add_system(buffer_creation)
             .add_system_to_stage(
                 CoreStage::PostUpdate,
