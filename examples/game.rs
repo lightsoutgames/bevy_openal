@@ -35,7 +35,10 @@ fn load_and_create(
         .get_group_load_state(handles.sounds.iter().map(|handle| handle.id))
         == LoadState::Loaded;
     if handles.loaded {
-        commands.spawn().insert(Listener).insert(Transform::default);
+        commands
+            .spawn()
+            .insert(Listener)
+            .insert(Transform::default());
         let handle = handles.sounds[0].clone();
         let buffer = asset_server.get_handle(handle);
         commands
@@ -46,18 +49,18 @@ fn load_and_create(
                 state: SoundState::Playing,
                 gain: 0.4,
                 looping: true,
-                ..Default::default()
+                ..default()
             });
     }
 }
 
 fn main() {
-    App::build()
+    App::new()
         .add_plugins(DefaultPlugins)
-        .add_system(bevy::input::system::exit_on_esc_system.system())
+        .add_system(bevy::input::system::exit_on_esc_system)
         .add_plugin(OpenAlPlugin)
         .init_resource::<AssetHandles>()
-        .add_startup_system(setup.system())
-        .add_system(load_and_create.system())
+        .add_startup_system(setup)
+        .add_system(load_and_create)
         .run();
 }

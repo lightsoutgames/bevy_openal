@@ -13,7 +13,6 @@ use bevy::{
     transform::TransformSystem,
     utils::BoxedFuture,
 };
-use derive_more::{Deref, DerefMut};
 use lewton::inside_ogg::OggStreamReader;
 use minimp3::{Decoder, Error};
 
@@ -206,8 +205,8 @@ pub struct Sound {
 impl Default for Sound {
     fn default() -> Self {
         Self {
-            buffer: Default::default(),
-            state: Default::default(),
+            buffer: default(),
+            state: default(),
             gain: 1.,
             looping: false,
             pitch: 1.,
